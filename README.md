@@ -1,5 +1,8 @@
 # Orphaned-Torrents-Finder
+
 Finds torrents that are orphaned (not in torrent list)
+Create rm commands for orphaned files
+Ignores ISOs
 
 # Usage
 
