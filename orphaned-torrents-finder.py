@@ -1,18 +1,39 @@
 import os
 import requests
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Settings
-qb_url = "http://127.0.0.1:8080"  # qBittorrent Web UI URL
-qb_user = "admin"
-qb_pass = "admin"
-completed_folder = r"qbittorrent/completed"
+qb_url = os.getenv("QB_URL")
+qb_user = os.getenv("QB_USER", "admin")
+qb_pass = os.getenv("QB_PASS", "admin")
+completed_folder = os.getenv("COMPLETED_FOLDER")
+
+# Validate required environment variables
+if not qb_url:
+    raise ValueError("QB_URL environment variable is required")
+if not completed_folder:
+    raise ValueError("COMPLETED_FOLDER environment variable is required")
 
 # Login to qBittorrent Web API
 s = requests.Session()
-s.post(f"{qb_url}/api/v2/auth/login", data={"username": qb_user, "password": qb_pass})
+login_response = s.post(
+    f"{qb_url}/api/v2/auth/login", data={"username": qb_user, "password": qb_pass}
+)
+
+if login_response.status_code != 200:
+    raise Exception(f"Failed to login to qBittorrent: {login_response.status_code}")
 
 # Get list of torrents from qBittorrent
-torrents = s.get(f"{qb_url}/api/v2/torrents/info").json()
+torrents_response = s.get(f"{qb_url}/api/v2/torrents/info")
+if torrents_response.status_code != 200:
+    raise Exception(
+        f"Failed to get torrents from qBittorrent: {torrents_response.status_code}"
+    )
+
+torrents = torrents_response.json()
 torrent_files = {os.path.basename(t["content_path"]) for t in torrents}
 
 # Get files in Completed folder (including subdirectories for categories)
@@ -20,7 +41,16 @@ completed_items = {}  # Changed to dict to track which folder each item is in
 category_count = 0
 total_items = 0
 
-for item in os.listdir(completed_folder):
+# Check if completed folder exists
+if not os.path.exists(completed_folder):
+    raise FileNotFoundError(f"Completed folder not found: {completed_folder}")
+
+try:
+    folder_contents = os.listdir(completed_folder)
+except PermissionError:
+    raise PermissionError(f"Cannot access completed folder: {completed_folder}")
+
+for item in folder_contents:
     item_path = os.path.join(completed_folder, item)
     if os.path.isdir(item_path):
         # This is a category folder, check inside it
